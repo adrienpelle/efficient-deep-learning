@@ -8,8 +8,8 @@ checkpoint/
 *.odt#
 
 ### Pytorch models
-*.pt
-*.pth
+#*.pt
+#*.pth
 
 ### Latex
 *.snm
