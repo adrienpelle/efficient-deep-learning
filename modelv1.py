@@ -8,6 +8,7 @@ from models_cifar100.resnet import ResNet18
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
+import numpy as np
 
 # Ensure reproducibility
 torch.manual_seed(0)
