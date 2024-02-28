@@ -1,86 +1,47 @@
-### See http://papers.nips.cc/paper/5647-binaryconnect-training-deep-neural-networks-with-b
-### for a complete description of the algotihm 
-
-
-#  
+import torch
 import torch.nn as nn
-import numpy
-
+import numpy as np
 
 class BC():
     def __init__(self, model):
+        self.model = model
+        self.saved_params = []
+        self.target_modules = []
+        self.bin_range = []
 
-        # First we need to 
-        # count the number of Conv2d and Linear
-        # This will be used next in order to build a list of all 
-        # parameters of the model 
-
-        count_targets = 0
+        # Count Conv2d and Linear modules to determine binarization targets
         for m in model.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-                count_targets = count_targets + 1
+            if isinstance(m, (nn.Conv2d, nn.Linear)):
+                tmp = m.weight.data.clone()
+                self.saved_params.append(tmp)
+                self.target_modules.append(m)
 
-        start_range = 0
-        end_range = count_targets-1
-        self.bin_range = numpy.linspace(start_range,
-                end_range, end_range-start_range+1)\
-                        .astype('int').tolist()
-
-        # Now we can initialize the list of parameters
-
-        self.num_of_params = len(self.bin_range)
-        self.saved_params = [] # This will be used to save the full precision weights
-        
-        self.target_modules = [] # this will contain the list of modules to be modified
-
-        self.model = model # this contains the model that will be trained and quantified
-
-        ### This builds the initial copy of all parameters and target modules
-        index = -1
-        for m in model.modules():
-            if isinstance(m, nn.Conv2d) or isinstance(m, nn.Linear):
-                index = index + 1
-                if index in self.bin_range:
-                    tmp = m.weight.data.clone()
-                    self.saved_params.append(tmp)
-                    self.target_modules.append(m.weight)
-
+        # Initialize bin_range for indexing
+        self.bin_range = list(range(len(self.target_modules)))
 
     def save_params(self):
-
-        ### This loop goes through the list of target modules, and saves the corresponding weights into the list of saved_parameters
-
-        for index in range(self.num_of_params):
-            self.saved_params[index].copy_(self.target_modules[index].data)
+        for index, module in enumerate(self.target_modules):
+            self.saved_params[index].copy_(module.weight.data)
 
     def binarization(self):
+        self.save_params()  # Save current full precision parameters
 
-        ### To be completed
+        # Binarize weights: Iterate through target modules and binarize
+        for module in self.target_modules:
+            # Use sign function for binarization
+            weight = module.weight.data
+            module.weight.data = weight.sign()
 
-        ### (1) Save the current full precision parameters using the save_params method
-
-        
-        1
-        ### (2) Binarize the weights in the model, by iterating through the list of target modules and overwrite the values with their binary version
-        
     def restore(self):
+        # Restore the saved full-precision weights
+        for index, module in enumerate(self.target_modules):
+            module.weight.data.copy_(self.saved_params[index])
 
-        ### restore the copy from self.saved_params into the model 
-
-        for index in range(self.num_of_params):
-            self.target_modules[index].data.copy_(self.saved_params[index])
-      
     def clip(self):
+        # Clip weights to [-1, 1] using Hardtanh
+        for module in self.target_modules:
+            module.weight.data = nn.functional.hardtanh_(module.weight.data)
 
-        ## To be completed 
-        ## Clip all parameters to the range [-1,1] using Hard Tanh 
-        ## you can use the nn.Hardtanh function
-
-        1
-
-
-    def forward(self,x):
-
-        ### This function is used so that the model can be used while training
-        out = self.model(x)
-        return out
+    def forward(self, x):
+        # Forward pass through the model
+        return self.model(x)

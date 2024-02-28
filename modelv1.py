@@ -56,15 +56,15 @@ testloader = DataLoader(c10test, batch_size=32)
 
 # Model setup
 model = ResNet18().to(device)
-optimizer = optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-6)
+optimizer = optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-6)
 criterion = nn.CrossEntropyLoss()
-scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=2, factor=0.1, verbose=True)
+scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, 'max', patience=10, factor=0.1)
 
 # Training loop
 n_epochs = args.num_epochs
 best_accuracy = 0
 early_stopping_counter = 0
-early_stopping_patience = 5
+early_stopping_patience = 20
 
 for epoch in range(n_epochs):
     model.train()
@@ -102,10 +102,17 @@ for epoch in range(n_epochs):
             correct_test += (predicted == labels).sum().item()
             total_test += labels.size(0)
 
-    test_accuracy = 100 * correct_test / total_test
+    validation_accuracy = 100 * correct_test / total_test
+
+    # Print epoch results
+    print(f"Epoch {epoch+1}/{n_epochs}:")
+    print(f"  Train Loss: {running_loss / len(trainloader):.4f} | Train Accuracy: {100. * correct_train / total_train:.2f}%")
+    print(f"Validation Accuracy: {validation_accuracy:.2f}%")
+
+    
     # Checkpointing and early stopping
-    if test_accuracy > best_accuracy:
-        best_accuracy = test_accuracy
+    if validation_accuracy > best_accuracy:
+        best_accuracy = validation_accuracy
         early_stopping_counter = 0
         torch.save(model.state_dict(), 'model_best.pth')
     else:
@@ -113,12 +120,25 @@ for epoch in range(n_epochs):
     if early_stopping_counter >= early_stopping_patience:
         print("Early stopping triggered.")
         break
+    
 
-    # Logging
-    writer.add_scalars('Metrics', {'Train Loss': np.mean(epoch_loss),
-                                   'Train Accuracy': 100. * correct_train / total_train,
-                                   'Validation Loss': np.mean(val_loss),
-                                   'Validation Accuracy': test_accuracy}, epoch)
+    current_lr = scheduler.optimizer.param_groups[0]['lr']
+    writer.add_scalar('Learning Rate', current_lr, epoch)
+    # Logging Train Loss
+    writer.add_scalar('Train/Loss', np.mean(epoch_loss))
+
+    # Logging Train Accuracy
+    writer.add_scalar('Train/Accuracy', 100. * correct_train / total_train)
+
+    # Logging Validation Loss
+    writer.add_scalar('Validation/Loss', np.mean(val_loss))
+
+    # Logging Validation Accuracy
+    writer.add_scalar('Validation/Accuracy', validation_accuracy)
+
+    for name, param in model.named_parameters():
+        writer.add_histogram(f'Weights/{name}', param, epoch)
+        writer.add_histogram(f'Gradients/{name}', param.grad, epoch)
 
 torch.save(model.state_dict(), 'end_of_training_model.pth')
 writer.close()

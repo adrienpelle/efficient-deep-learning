@@ -65,17 +65,22 @@ class Bottleneck(nn.Module):
 
 
 class ResNet(nn.Module):
-    def __init__(self, block, num_blocks, num_classes=100,fmaps_repeat=64):
+    def __init__(self, block, num_blocks, num_classes=100,fmaps_repeat=64,p=0.10):
         super(ResNet, self).__init__()
         self.in_planes = fmaps_repeat
         self.fmaps_repeat = fmaps_repeat
 
         self.conv1 = nn.Conv2d(3, self.in_planes, kernel_size=3, stride=1, padding=1, bias=False)
+        self.dropout = nn.Dropout(p) 
         self.bn1 = nn.BatchNorm2d(self.in_planes)
         self.layer1 = self._make_layer(block, self.fmaps_repeat, num_blocks[0], stride=1)
+        self.dropout = nn.Dropout(p) 
         self.layer2 = self._make_layer(block, 2*self.fmaps_repeat, num_blocks[1], stride=2)
+        self.dropout = nn.Dropout(p) 
         self.layer3 = self._make_layer(block, 4*self.fmaps_repeat, num_blocks[2], stride=2)
+        self.dropout = nn.Dropout(p) 
         self.layer4 = self._make_layer(block, 8*self.fmaps_repeat, num_blocks[3], stride=2)
+        self.dropout = nn.Dropout(p) 
         self.linear = nn.Linear((8*self.fmaps_repeat)*block.expansion, num_classes)
 
     def _make_layer(self, block, planes, num_blocks, stride):
@@ -88,12 +93,17 @@ class ResNet(nn.Module):
 
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
-        out = self.layer1(out)
+        out = self.dropout(out)
+        out = self.layer1(out) 
+        out = self.dropout(out)
         out = self.layer2(out)
+        out = self.dropout(out)
         out = self.layer3(out)
+        out = self.dropout(out)
         out = self.layer4(out)
         out = F.avg_pool2d(out, 4)
         out = out.view(out.size(0), -1)
+        out = self.dropout(out)
         out = self.linear(out)
         return out
 
