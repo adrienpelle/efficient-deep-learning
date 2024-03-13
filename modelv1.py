@@ -114,7 +114,7 @@ for epoch in range(n_epochs):
     if validation_accuracy > best_accuracy:
         best_accuracy = validation_accuracy
         early_stopping_counter = 0
-        torch.save(model.state_dict(), 'model_best.pth')
+        torch.save(model.state_dict(), 'test_resnet_best2.pth')
     else:
         early_stopping_counter += 1
     if early_stopping_counter >= early_stopping_patience:

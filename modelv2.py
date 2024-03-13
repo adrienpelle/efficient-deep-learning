@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torchvision import datasets, transforms
-from binarryconnect import BC
+from binaryconnect import BC
 from torch.utils.data import DataLoader
 from models_cifar100.resnet import ResNet18  # Adjust import path as needed
 import numpy as np
@@ -38,13 +38,13 @@ transform_test = transforms.Compose([
 train_dataset = datasets.CIFAR10(root='./data', train=True, download=True, transform=transform_train)
 test_dataset = datasets.CIFAR10(root='./data', train=False, download=True, transform=transform_test)
 
-train_loader = DataLoader(train_dataset, batch_size=128, shuffle=True, num_workers=2)
-test_loader = DataLoader(test_dataset, batch_size=100, shuffle=False, num_workers=2)
+train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True, num_workers=2)
+test_loader = DataLoader(test_dataset, batch_size=32, shuffle=False, num_workers=2)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = ResNet18().to(device)
-model_path = 'best_model.pth'
+model_path = 'model_best.pth'
 model.load_state_dict(torch.load(model_path))
 bc = BC(model)
 criterion = nn.CrossEntropyLoss()
@@ -52,7 +52,7 @@ optimizer = optim.Adam(model.parameters(), lr=0.001)
 
 
 def train_and_validate(model, bc, train_loader, test_loader, criterion, optimizer, epochs=20, mode='both'):
-    best_acc = 0.0
+    best_binarized_acc = 0.0
     best_epoch = 0
     for epoch in range(epochs):
         if mode == 'both':
@@ -61,7 +61,7 @@ def train_and_validate(model, bc, train_loader, test_loader, criterion, optimize
                 inputs, targets = inputs.to(device), targets.to(device)
                 optimizer.zero_grad()
                 bc.binarization()
-                outputs = model(inputs)
+                outputs = bc.forward(inputs)
                 loss = criterion(outputs, targets)
                 loss.backward()
                 bc.restore()
@@ -76,37 +76,43 @@ def train_and_validate(model, bc, train_loader, test_loader, criterion, optimize
                 writer.add_histogram(f'{name}/weights', param, epoch)
                 writer.add_histogram(f'{name}/grads', param.grad, epoch)
         
-        # Validation step
-        val_acc = validate(model, bc, test_loader, criterion)
-        writer.add_scalar('Accuracy/validation', val_acc, epoch)
+        # Validate the binarized model's performance
+        bc.binarization()  # Apply binarization
+        binarized_val_acc = validate(model, bc, test_loader, criterion)
+        bc.restore()  # Restore full-precision weights
+        writer.add_scalar('Accuracy/validation_binarized', binarized_val_acc, epoch)
 
-        if val_acc > best_acc:
-            best_acc = val_acc
-            best_epoch = epoch
-            torch.save(model.state_dict(), args.model_path)
+        # Check if the binarized model is the best so far
+        if binarized_val_acc > best_binarized_acc:
+            best_binarized_acc = binarized_val_acc
+            torch.save(model.state_dict(), 'best_binarized_model.pth')
+            print(f"New best binarized model saved with accuracy: {best_binarized_acc:.2f}%")
 
-    return best_epoch, best_acc
-
+    return best_epoch, best_binarized_acc
 def validate(model, bc, loader, criterion):
     model.eval()
+    bc=BC(model)
     correct = 0
     total = 0
     with torch.no_grad():
-        for batch_idx, (inputs, targets) in enumerate(loader):
+        for inputs, targets in loader:
             inputs, targets = inputs.to(device), targets.to(device)
             bc.binarization()
-            outputs = model(inputs)
+            outputs = bc.forward(inputs)
             _, predicted = torch.max(outputs.data, 1)
             total += targets.size(0)
-            correct += predicted.eq(targets.data).cpu().sum()
-
+            correct += (predicted == targets).sum().item()
     bc.restore()
+    accuracy = 100. * correct / total
+    return accuracy  # Ensure this line is present to return the computed accuracy
+
 
 if __name__ == "__main__":
     if args.mode == 'both':
         print("Starting training and validation...")
-        best_epoch, best_acc = train_and_validate(model, bc, train_loader, test_loader, criterion, optimizer, epochs=args.epochs, mode='both')
-        print(f'Best Model: Epoch {best_epoch+1}, Validation Accuracy: {best_acc:.2f}%')
+        best_epoch, best_acc, best_binarized_acc = train_and_validate(model, bc, train_loader, test_loader, criterion, optimizer, epochs=args.epochs, mode='both')
+        print(f'Best Full-Precision Model: Epoch {best_epoch+1}, Validation Accuracy: {best_acc:.2f}%')
+        print(f'Best Binarized Model Validation Accuracy: {best_binarized_acc:.2f}%')
     elif args.mode == 'validate':
         print("Starting validation only...")
         if os.path.isfile(args.model_path):
@@ -118,3 +124,4 @@ if __name__ == "__main__":
         validate_accuracy = validate(model, bc, test_loader, criterion)
         print(f'Validation Accuracy: {validate_accuracy:.2f}%')
     writer.close()
+    
