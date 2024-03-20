@@ -4,7 +4,8 @@ from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
 from torch.utils.data.dataloader import DataLoader
 import torch.nn as nn
-from models_cifar100.resnet import ResNet18
+from models_cifar100.resnet import ResNet18_Depthwise
+from models_cifar100.resnet2 import ResNet18
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
 from tqdm import tqdm
@@ -114,7 +115,7 @@ for epoch in range(n_epochs):
     if validation_accuracy > best_accuracy:
         best_accuracy = validation_accuracy
         early_stopping_counter = 0
-        torch.save(model.state_dict(), 'test_resnet_best2.pth')
+        torch.save(model.state_dict(), 'model_base_best.pth')
     else:
         early_stopping_counter += 1
     if early_stopping_counter >= early_stopping_patience:

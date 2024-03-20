@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 import resnet
 
+
 our_quant=16
 quant_factors={1:32,8:4,16:2,32:1}
 quant_factor= quant_factors[our_quant]
@@ -131,7 +132,7 @@ def main():
     # ref_params = 36500000
     # ref_flops  = 10490000000
 
-    model = resnet.ResNet18()
+    model = resnet.ResNet18_Depthwise()
     print(model)
     flops, params = profile(model, (1,3,32,32))
     flops, params = flops.item(), params.item()
