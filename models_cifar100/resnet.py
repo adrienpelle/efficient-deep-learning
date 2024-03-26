@@ -42,14 +42,14 @@ class Factorized(nn.Module):
 
     def __init__(self, in_planes, planes, stride=1):
         super(Factorized, self).__init__()
-        mid_planes = planes // 2  # Réduction de la dimension pour la convolution intermédiaire
+        mid_planes = planes // 2  
 
         self.depthwise1 = nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=stride, padding=1, groups=in_planes, bias=False)
         self.bn1 = nn.BatchNorm2d(in_planes)
         self.pointwise1 = nn.Conv2d(in_planes, mid_planes, kernel_size=1, bias=False)
         self.bn2 = nn.BatchNorm2d(mid_planes)
 
-        # Ajout d'une convolution en profondeur et d'une convolution ponctuelle factorisées
+     
         self.depthwise2 = nn.Conv2d(mid_planes, mid_planes, kernel_size=3, stride=1, padding=1, groups=mid_planes, bias=False)
         self.bn3 = nn.BatchNorm2d(mid_planes)
         self.pointwise2 = nn.Conv2d(mid_planes, planes, kernel_size=1, bias=False)

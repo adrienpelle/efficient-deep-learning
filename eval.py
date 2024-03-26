@@ -1,10 +1,15 @@
 import torch
 import torch.nn as nn
-from models_cifar100.resnet import ResNet18_Depthwise  # Adjust this import to match your directory structure.
+from models_cifar100.resnet import ResNet18_Depthwise
+from models_cifar100.resnet2 import ResNet18  # Adjust this import to match your directory structure.
 from torchvision.datasets import CIFAR10
 import torchvision.transforms as transforms
 from torch.utils.data.dataloader import DataLoader
 import numpy as np
+import ssl
+
+ssl._create_default_https_context = ssl._create_unverified_context
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -13,7 +18,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # Define the model (assuming hyperparameters, if any, are predefined within the model)
 model = ResNet18_Depthwise().to(device)
-
+model.load_state_dict(torch.load('10_pruned.pth'))
 # Load the trained parameters
 #model.load_state_dict(loaded_cpt)
 model.half()  # Convert model to half precision

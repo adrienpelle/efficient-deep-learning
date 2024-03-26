@@ -2,7 +2,7 @@ import os
 import torch
 import torch.nn as nn
 import resnet
-
+from resnet3 import ResNet18_Mini
 
 our_quant=16
 quant_factors={1:32,8:4,16:2,32:1}
@@ -132,9 +132,10 @@ def main():
     # ref_params = 36500000
     # ref_flops  = 10490000000
 
-    model = resnet.ResNet18_Depthwise()
-    print(model)
-    flops, params = profile(model, (1,3,32,32))
+    model = ResNet18_Mini()
+    #model.load_state_dict(torch.load("50_pruned.pth"))
+    flops, params = profile(model, 
+                            (1,3,32,32))
     flops, params = flops.item(), params.item()
 
     score_flops = flops / ref_flops

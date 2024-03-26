@@ -13,6 +13,7 @@ from tqdm import tqdm
 import numpy as np
 from models_cifar100.resnet import ResNet18_Depthwise
 from models_cifar100.resnet2 import ResNet18
+from models_cifar100.resnet3 import ResNet18_Mini
 
 
 
@@ -44,10 +45,12 @@ c10test = CIFAR10(rootdir, train=False, download=True, transform=transform_test)
 testloader = DataLoader(c10test, batch_size=32)
 
 teacher_model = ResNet18().to(device)
+student_model = ResNet18_Mini().to(device)
+
 if args.new_model:
-    student_model = ResNet18_Depthwise().to(device)
+    pass  
 else:
-    student_model = torch.load(args.model_path).to(device)
+    student_model.load_state_dict(torch.load(args.model_path))
 
 teacher_model.load_state_dict(torch.load('model_base_best.pth'))
 
@@ -56,11 +59,10 @@ for param in teacher_model.parameters():
 
 optimizer = optim.Adam(student_model.parameters(), lr=0.001, weight_decay=1e-4)
 criterion = nn.CrossEntropyLoss()
-# Assuming optimizer is already defined
 scheduler = OneCycleLR(optimizer, max_lr=0.01, steps_per_epoch=len(trainloader), epochs=args.num_epochs)
 
-temperature = 4
-alpha = 0.3
+temperature = 10
+alpha = 0.2
 
 def mixup_data(x, y, alpha=1.0):
     if alpha > 0:
@@ -95,7 +97,7 @@ class LossCalculator(nn.Module):
 
 loss_calculator = LossCalculator(temperature, alpha).to(device)
 best_val_accuracy=0
-early_stopping_patience=15
+early_stopping_patience=20
 
 for epoch in range(args.num_epochs):
     student_model.train()
@@ -123,7 +125,7 @@ for epoch in range(args.num_epochs):
         total_train += labels.size(0)
         correct_train += (predicted == labels).sum().item()
 
-    # Log training loss and accuracy
+    
     train_accuracy = 100 * correct_train / total_train
     print(f"Epoch {epoch+1}: Training Accuracy: {train_accuracy}%")
     writer.add_scalar('Training/Loss', running_loss / len(trainloader), epoch)
@@ -151,7 +153,7 @@ for epoch in range(args.num_epochs):
     if val_accuracy > best_val_accuracy:
         best_val_accuracy = val_accuracy
         early_stopping_counter = 0
-        torch.save(student_model.state_dict(), 'best_distillated_model.pth')
+        torch.save(student_model.state_dict(), 'finalv4.pth')
         print('New best model saved')
     else:
         early_stopping_counter += 1
@@ -160,15 +162,15 @@ for epoch in range(args.num_epochs):
         print("Early stopping triggered.")
         break
 
-    # Log learning rate
+
     lr = optimizer.param_groups[0]['lr']
     writer.add_scalar('Learning Rate', lr, epoch)
 
-    # Update scheduler and check for early stopping
+    
     scheduler.step(val_accuracy)
     
 
-    # Log weights and gradients
+    
     for name, param in student_model.named_parameters():
         writer.add_histogram(f'{name}/weights', param, epoch)
         writer.add_histogram(f'{name}/gradients', param.grad, epoch)
